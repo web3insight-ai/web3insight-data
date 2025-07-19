@@ -4,7 +4,7 @@
 # @filename: 
 # @version: 
 # @Description: 
- # @LastEditTime: 2025-07-19 14:11:34
+ # @LastEditTime: 2025-07-19 06:35:30
 ### 
 #!/bin/bash
 -set -e
@@ -32,6 +32,7 @@ download_day() {
     else
       echo "下载中：$url"
       curl -s -o "$outpath" "$url"
+      echo "下载完成：$outpath" 
     fi
   done
 }
