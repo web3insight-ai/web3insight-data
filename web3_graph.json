@@ -97,7 +97,7 @@
                     "fields": [
                         {
                             "type": "LONG",
-                            "field": "actor_id",
+                            "field": "id",
                             "alias": "event_id"
                         }
                     ]
@@ -106,7 +106,7 @@
                     "fields": [
                         {
                             "type": "LONG",
-                            "field": "repo_id",
+                            "field": "actor_id",
                             "alias": "from_id"
                         }
                     ]
@@ -115,7 +115,7 @@
                     "fields": [
                         {
                             "type": "LONG",
-                            "field": "id",
+                            "field": "repo_id",
                             "alias": "to_id"
                         }
                     ]

@@ -1,8 +1,7 @@
-with
-    -- 需要排序的生态列表
-    eco_list as (
-        select
-            array[
+with -- 需要排序的生态列表
+eco_list as (
+    select
+        array [
                 'Ethereum',
                 'Bitcoin',
                 'Solana',
@@ -17,12 +16,12 @@ with
                 'OpenBuild',
                 'Nexus'
             ] as eco_names
-    ),
-    -- 需要排除的机器人列表
-    bot_list as (
-        select distinct
-            unnest(
-                array[
+),
+-- 需要排除的机器人列表
+bot_list as (
+    select
+        distinct unnest(
+            array [
                     105309205,
                     96656532,
                     8517910,
@@ -867,157 +866,156 @@ with
                     204705513,
                     204707759
                 ]
-            ) as actor_id
-    ),
-    -- 活跃开发者：近 1 年内 PR 提交月数大于等于 9 个月的开发者
-    active_actor as (
-        select
-            t1.actor_id
-        from
-            (
-                select
-                    actor_id
-                from
-                    web3.event
-                where
-                    created_at >= now() - interval '1 year'
-                    and event_type = 'PullRequestEvent'
-                    and payload::jsonb ->> 'action' = 'opened'
-                    and payload::jsonb -> 'pull_request' -> 'user' ->> 'type' = 'User'
-                group by
-                    actor_id
-                having
-                    count(distinct to_char(created_at, 'YYYY-MM')) >= 9
-            ) as t1
-            left join bot_list on t1.actor_id = bot_list.actor_id
-        where
-            bot_list.actor_id is null
-    ),
-    -- 统计仓库近 1 年的事件：活跃开发者人数、非活跃开发者人数、活跃开发者提交次数、非活跃开发者提交次数、star 数、fork 数
-    repo_metric as (
-        select
-            t1.repo_id,
-            count(distinct t1.actor_id) filter (
-                where
-                    t1.event_type = 'PullRequestEvent'
-                    and t1.payload ->> 'action' = 'opened'
-                    and t1.payload -> 'pull_request' -> 'user' ->> 'type' = 'User'
-                    and active_actor.actor_id is not null
-            ) active_actor_count,
-            count(distinct t1.actor_id) filter (
-                where
-                    t1.event_type = 'PullRequestEvent'
-                    and t1.payload ->> 'action' = 'opened'
-                    and t1.payload -> 'pull_request' -> 'user' ->> 'type' = 'User'
-                    and active_actor.actor_id is null
-            ) none_active_actor_count,
-            count(distinct t1.id) filter (
-                where
-                    t1.event_type = 'PullRequestEvent'
-                    and t1.payload ->> 'action' = 'opened'
-                    and t1.payload -> 'pull_request' -> 'user' ->> 'type' = 'User'
-                    and active_actor.actor_id is not null
-            ) active_actor_pr_count,
-            count(distinct t1.id) filter (
-                where
-                    t1.event_type = 'PullRequestEvent'
-                    and t1.payload ->> 'action' = 'opened'
-                    and t1.payload -> 'pull_request' -> 'user' ->> 'type' = 'User'
-                    and active_actor.actor_id is null
-            ) none_active_actor_pr_count,
-            count(distinct t1.id) filter (
-                where
-                    t1.event_type = 'WatchEvent'
-            ) as star_count,
-            count(distinct t1.id) filter (
-                where
-                    t1.event_type = 'ForkEvent'
-            ) as fork_count
-        from
-            (
-                select
-                    id,
-                    actor_id,
-                    repo_id,
-                    event_type,
-                    payload::jsonb as payload
-                from
-                    web3.event
-                where
-                    created_at >= now() - interval '1 year'
-                    and event_type in ('PullRequestEvent', 'WatchEvent', 'ForkEvent')
-            ) as t1
-            left join bot_list on t1.actor_id = bot_list.actor_id
-            left join active_actor on t1.actor_id = active_actor.actor_id
-        where
-            bot_list.actor_id is null
-        group by
-            t1.repo_id
-    ),
-    -- 聚合仓库所属生态和所属生态数量，生态仅考虑“根生态”（branch 为空）
-    repo_eco as (
-        select
-            t1.repo_id,
-            t1.repo_name,
-            t1.eco_names,
-            t1.eco_count
-        from
-            (
-                select
-                    repo_id,
-                    max(repo_name) as repo_name,
-                    array_agg(key) as eco_names,
-                    array_length(array_agg(key), 1) as eco_count
-                from
-                    web3.repos,
-                    jsonb_each(upstream_marks)
-                where
-                    key <> 'ALL'
-                    and (value -> 'branch') = '[]'::jsonb
-                group by
-                    repo_id
-            ) as t1
-            join eco_list on t1.eco_names && eco_list.eco_names
-    ),
-    -- 计算仓库得分：
-    -- - 使用对数平滑高活行为的影响
-    -- - star、fork 行为最容易，权重为基础权重 0.1
-    -- - 设定非活跃开发者提交 1 次 PR 相当于 10 次 star/fork，因此权重为 0.2
-    -- - 活跃开发者的提交 PR 权重较非活跃开发者的高，因此权重为 0.3
-    -- - 设定最重要的是开发者人数，非活跃开发者数权重 0.3，活跃开发者数权重 0.4
-    -- - 如果一个项目属于多个生态，则对其衰减：$e^{-0.1 * (eco\_num - 1)}$
-    eco_metric as (
-        select
-            unnest(repo_eco.eco_names) as eco_name,
-            repo_eco.repo_name,
-            t1.score * exp(-0.1 * (repo_eco.eco_count - 1)) as score
-        from
-            (
-                select
-                    repo_id,
-                    (
-                        log(active_actor_count + 1) * 0.4 + log(none_active_actor_count + 1) * 0.3 + log(active_actor_pr_count + 1) * 0.3 + log(none_active_actor_pr_count + 1) * 0.2 + log(star_count + 1) * 0.1 + log(fork_count + 1) * 0.1
-                    ) as score
-                from
-                    repo_metric
-            ) as t1
-            inner join repo_eco on t1.repo_id = repo_eco.repo_id
-    ),
-    final_table as (
-        select
-            eco_name,
-            repo_name,
-            rank() over (
-                partition by
-                    eco_name
-                order by
-                    score desc
-            ) as rn,
-            score
-        from
-            eco_metric
-            join eco_list on eco_metric.eco_name = any (eco_list.eco_names)
-    )
+        ) as actor_id
+),
+-- 活跃开发者：近 1 年内 PR 提交月数大于等于 9 个月的开发者
+active_actor as (
+    select
+        t1.actor_id
+    from
+        (
+            select
+                actor_id
+            from
+                web3.event
+            where
+                created_at >= now() - interval '1 year'
+                and event_type = 'PullRequestEvent'
+                and payload :: jsonb ->> 'action' = 'opened'
+                and payload :: jsonb -> 'pull_request' -> 'user' ->> 'type' = 'User'
+            group by
+                actor_id
+            having
+                count(distinct to_char(created_at, 'YYYY-MM')) >= 9
+        ) as t1
+        left join bot_list on t1.actor_id = bot_list.actor_id
+    where
+        bot_list.actor_id is null
+),
+-- 统计仓库近 1 年的事件：活跃开发者人数、非活跃开发者人数、活跃开发者提交次数、非活跃开发者提交次数、star 数、fork 数
+repo_metric as (
+    select
+        t1.repo_id,
+        count(distinct t1.actor_id) filter (
+            where
+                t1.event_type = 'PullRequestEvent'
+                and t1.payload ->> 'action' = 'opened'
+                and t1.payload -> 'pull_request' -> 'user' ->> 'type' = 'User'
+                and active_actor.actor_id is not null
+        ) active_actor_count,
+        count(distinct t1.actor_id) filter (
+            where
+                t1.event_type = 'PullRequestEvent'
+                and t1.payload ->> 'action' = 'opened'
+                and t1.payload -> 'pull_request' -> 'user' ->> 'type' = 'User'
+                and active_actor.actor_id is null
+        ) none_active_actor_count,
+        count(distinct t1.id) filter (
+            where
+                t1.event_type = 'PullRequestEvent'
+                and t1.payload ->> 'action' = 'opened'
+                and t1.payload -> 'pull_request' -> 'user' ->> 'type' = 'User'
+                and active_actor.actor_id is not null
+        ) active_actor_pr_count,
+        count(distinct t1.id) filter (
+            where
+                t1.event_type = 'PullRequestEvent'
+                and t1.payload ->> 'action' = 'opened'
+                and t1.payload -> 'pull_request' -> 'user' ->> 'type' = 'User'
+                and active_actor.actor_id is null
+        ) none_active_actor_pr_count,
+        count(distinct t1.id) filter (
+            where
+                t1.event_type = 'WatchEvent'
+        ) as star_count,
+        count(distinct t1.id) filter (
+            where
+                t1.event_type = 'ForkEvent'
+        ) as fork_count
+    from
+        (
+            select
+                id,
+                actor_id,
+                repo_id,
+                event_type,
+                payload :: jsonb as payload
+            from
+                web3.event
+            where
+                created_at >= now() - interval '1 year'
+                and event_type in ('PullRequestEvent', 'WatchEvent', 'ForkEvent')
+        ) as t1
+        left join bot_list on t1.actor_id = bot_list.actor_id
+        left join active_actor on t1.actor_id = active_actor.actor_id
+    where
+        bot_list.actor_id is null
+    group by
+        t1.repo_id
+),
+-- 聚合仓库所属生态和所属生态数量，生态仅考虑“根生态”（branch 为空）
+repo_eco as (
+    select
+        t1.repo_id,
+        t1.repo_name,
+        t1.eco_names,
+        t1.eco_count
+    from
+        (
+            select
+                repo_id,
+                max(repo_name) as repo_name,
+                array_agg(key) as eco_names,
+                array_length(array_agg(key), 1) as eco_count
+            from
+                web3.repos,
+                jsonb_each(upstream_marks)
+            where
+                key <> 'ALL'
+                and (value -> 'branch') = '[]' :: jsonb
+            group by
+                repo_id
+        ) as t1
+        join eco_list on t1.eco_names & & eco_list.eco_names
+),
+-- 计算仓库得分：
+-- - 使用对数平滑高活行为的影响
+-- - star、fork 行为最容易，权重为基础权重 0.1
+-- - 设定非活跃开发者提交 1 次 PR 相当于 10 次 star/fork，因此权重为 0.2
+-- - 活跃开发者的提交 PR 权重较非活跃开发者的高，因此权重为 0.3
+-- - 设定最重要的是开发者人数，非活跃开发者数权重 0.3，活跃开发者数权重 0.4
+-- - 如果一个项目属于多个生态，则对其衰减：$e^{-0.1 * (eco\_num - 1)}$
+eco_metric as (
+    select
+        unnest(repo_eco.eco_names) as eco_name,
+        repo_eco.repo_name,
+        t1.score * exp(-0.1 * (repo_eco.eco_count - 1)) as score
+    from
+        (
+            select
+                repo_id,
+                (
+                    log(active_actor_count + 1) * 0.4 + log(none_active_actor_count + 1) * 0.3 + log(active_actor_pr_count + 1) * 0.3 + log(none_active_actor_pr_count + 1) * 0.2 + log(star_count + 1) * 0.1 + log(fork_count + 1) * 0.1
+                ) as score
+            from
+                repo_metric
+        ) as t1
+        inner join repo_eco on t1.repo_id = repo_eco.repo_id
+),
+final_table as (
+    select
+        eco_name,
+        repo_name,
+        rank() over (
+            partition by eco_name
+            order by
+                score desc
+        ) as rn,
+        score
+    from
+        eco_metric
+        join eco_list on eco_metric.eco_name = any (eco_list.eco_names)
+)
 select
     eco_name,
     repo_name,
