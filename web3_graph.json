@@ -1,158 +1,188 @@
 {
-    "catalogs": [
-        {
-            "name": "web3",
-            "type": "postgresql",
-            "jdbc": {
-                "username": "lizhuo",
-                "password": "lizhuo%^&",
-                "jdbcUri": "jdbc:postgresql://95.217.113.40:5432/data",
-                "driverClass": "org.postgresql.Driver",
-                "enableMetaCache": "true",
-                "metaCacheExpireSec": "600"
-            }
-        }
-    ],
-    "graph": {
-        "vertices": [
+  "catalogs": [
+    {
+      "name": "web3",
+      "type": "postgresql",
+      "jdbc": {
+        "username": "lizhuo",
+        "password": "lizhuo%^&",
+        "jdbcUri": "jdbc:postgresql://95.217.113.40:5432/data",
+        "driverClass": "org.postgresql.Driver",
+        "enableMetaCache": "true",
+        "metaCacheExpireSec": "600"
+      }
+    }
+  ],
+  "graph": {
+    "vertices": [
+      {
+        "label": "actors",
+        "oneToOne": {
+          "tableSource": {
+            "catalog": "web3",
+            "schema": "data",
+            "table": "actors"
+          },
+          "id": {
+            "fields": [
+              {
+                "type": "LONG",
+                "field": "actor_id",
+                "alias": "actor_id"
+              }
+            ]
+          },
+          "attributes": [
             {
-                "label": "actors",
-                "oneToOne": {
-                    "tableSource": {
-                        "catalog": "web3",
-                        "schema": "web3",
-                        "table": "actors"
-                    },
-                    "id": {
-                        "fields": [
-                            {
-                                "type": "LONG",
-                                "field": "actor_id",
-                                "alias": "actor_id"
-                            }
-                        ]
-                    },
-                    "attributes": [
-                        {
-                            "type": "STRING",
-                            "field": "actor_login",
-                            "alias": "actor_login"
-                        },
-                        {
-                            "type": "DATETIME",
-                            "field": "created_at",
-                            "alias": "created_at"
-                        }
-                    ]
-                }
+              "type": "STRING",
+              "field": "actor_login",
+              "alias": "actor_login"
             },
             {
-                "label": "repos",
-                "oneToOne": {
-                    "tableSource": {
-                        "catalog": "web3",
-                        "schema": "web3",
-                        "table": "repos"
-                    },
-                    "id": {
-                        "fields": [
-                            {
-                                "type": "LONG",
-                                "field": "repo_id",
-                                "alias": "repo_id"
-                            }
-                        ]
-                    },
-                    "attributes": [
-                        {
-                            "type": "STRING",
-                            "field": "repo_name",
-                            "alias": "repo_name"
-                        },
-                        {
-                            "type": "DATETIME",
-                            "field": "created_at",
-                            "alias": "created_at"
-                        },
-                        {
-                            "type": "BOOLEAN",
-                            "field": "is_abnormal",
-                            "alias": "is_abnormal"
-                        }
-                    ]
-                }
+              "type": "DATETIME",
+              "field": "created_at",
+              "alias": "created_at"
             }
-        ],
-        "edges": [
+          ]
+        }
+      },
+      {
+        "label": "repos",
+        "oneToOne": {
+          "tableSource": {
+            "catalog": "web3",
+            "schema": "data",
+            "table": "repos"
+          },
+          "id": {
+            "fields": [
+              {
+                "type": "LONG",
+                "field": "repo_id",
+                "alias": "repo_id"
+              }
+            ]
+          },
+          "attributes": [
             {
-                "label": "event",
-                "fromVertex": "actors",
-                "toVertex": "repos",
-                "tableSource": {
-                    "catalog": "web3",
-                    "schema": "web3",
-                    "table": "event"
-                },
-                "id": {
-                    "fields": [
-                        {
-                            "type": "LONG",
-                            "field": "id",
-                            "alias": "event_id"
-                        }
-                    ]
-                },
-                "fromId": {
-                    "fields": [
-                        {
-                            "type": "LONG",
-                            "field": "actor_id",
-                            "alias": "from_id"
-                        }
-                    ]
-                },
-                "toId": {
-                    "fields": [
-                        {
-                            "type": "LONG",
-                            "field": "repo_id",
-                            "alias": "to_id"
-                        }
-                    ]
-                },
-                "attributes": [
-                    {
-                        "type": "LONG",
-                        "field": "org_id",
-                        "alias": "org_id"
-                    },
-                    {
-                        "type": "STRING",
-                        "field": "org_login",
-                        "alias": "org_login"
-                    },
-                    {
-                        "type": "STRING",
-                        "field": "event_type",
-                        "alias": "event_type"
-                    },
-                    {
-                        "type": "STRING",
-                        "field": "body",
-                        "alias": "body"
-                    },
-                    {
-                        "type": "BOOLEAN",
-                        "field": "public",
-                        "alias": "public"
-                    },
-                    {
-                        "type": "DATETIME",
-                        "field": "created_at",
-                        "alias": "created_at"
-                    }
-                ]
+              "type": "STRING",
+              "field": "repo_name",
+              "alias": "repo_name"
+            },
+            {
+              "type": "BOOLEAN",
+              "field": "indexed",
+              "alias": "indexed"
+            },
+            {
+              "type": "DATETIME",
+              "field": "created_at",
+              "alias": "created_at"
+            },
+            {
+              "type": "DATETIME",
+              "field": "api_updated_at",
+              "alias": "api_updated_at"
             }
+          ]
+        }
+      }
+    ],
+    "edges": [
+      {
+        "label": "events",
+        "fromVertex": "actors",
+        "toVertex": "repos",
+        "tableSource": {
+          "catalog": "web3",
+          "schema": "data",
+          "table": "events"
+        },
+        "id": {
+          "fields": [
+            {
+              "type": "LONG",
+              "field": "id",
+              "alias": "event_id"
+            }
+          ]
+        },
+        "fromId": {
+          "fields": [
+            {
+              "type": "LONG",
+              "field": "actor_id",
+              "alias": "from_id"
+            }
+          ]
+        },
+        "toId": {
+          "fields": [
+            {
+              "type": "LONG",
+              "field": "repo_id",
+              "alias": "to_id"
+            }
+          ]
+        },
+        "attributes": [
+          {
+            "type": "LONG",
+            "field": "id",
+            "alias": "id"
+          },
+          {
+            "type": "LONG",
+            "field": "actor_id",
+            "alias": "actor_id"
+          },
+          {
+            "type": "STRING",
+            "field": "actor_login",
+            "alias": "actor_login"
+          },
+          {
+            "type": "LONG",
+            "field": "repo_id",
+            "alias": "repo_id"
+          },
+          {
+            "type": "STRING",
+            "field": "repo_name",
+            "alias": "repo_name"
+          },
+          {
+            "type": "LONG",
+            "field": "org_id",
+            "alias": "org_id"
+          },
+          {
+            "type": "STRING",
+            "field": "org_login",
+            "alias": "org_login"
+          },
+          {
+            "type": "STRING",
+            "field": "event_type",
+            "alias": "event_type"
+          },
+          {
+            "type": "STRING",
+            "field": "body",
+            "alias": "body"
+          },
+          {
+            "type": "INT",
+            "field": "abnormal",
+            "alias": "abnormal"
+          },
+          {
+            "type": "DATETIME",
+            "field": "created_at",
+            "alias": "created_at"
+          }
         ]
-    }
+      }
+    ]
+  }
 }

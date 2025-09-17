@@ -55,3 +55,8 @@ ORDER BY
     active_months DESC
 LIMIT
     15;
+
+
+MATCH (n) WITH n LIMIT 10
+MATCH (n)-[r]->(m) RETURN n, r, m;
+
