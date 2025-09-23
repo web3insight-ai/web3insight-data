@@ -6,7 +6,7 @@
 # data
 Data/raw/
 Data/extracted/
-Data/Neo4j/**
-Data/PGSQL/**
+Data/Neo4j.bak/**
+Data/PGSQL.bak/**
 
 
