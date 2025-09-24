@@ -9,4 +9,7 @@ Data/extracted/
 Data/Neo4j.bak/**
 Data/PGSQL.bak/**
 
+## SQL-DATA
+SQL/SQL_with_normzlization/output/** 
+
 
