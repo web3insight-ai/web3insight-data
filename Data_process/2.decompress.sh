@@ -6,7 +6,7 @@ set -e
 # @filename: 2.decompress.sh
 # @version: 1.2
 # @Description: gharchive 解压缩脚本（macOS+Linux 兼容 + 日志增强）
- # @LastEditTime: 2025-09-27 20:51:25
+ # @LastEditTime: 2025-09-27 20:55:23
 ###
 
 RAW_BASE="../Data/raw"
@@ -78,15 +78,19 @@ decompress_dir_parallel() {
         now=$(date "+%Y-%m-%d %H:%M:%S")
 
         mkdir -p "$(dirname "$output")"
+
         if [[ -f "$output" ]]; then
             echo -e "\033[0;34m⏭️\033[0m 已存在，跳过：$output"
             echo "[$now] ⏭️ 已存在，跳过：$output" >> "'"$LOG_FILE"'"
-        elif gunzip -c "$input" > "$output"; then
+        elif gunzip -c "$input" > "$output" 2>/tmp/gunzip_err.txt; then
             echo -e "\033[0;32m✅\033[0m 解压完成：$input → $output"
             echo "[$now] ✅ 解压完成：$input → $output" >> "'"$LOG_FILE"'"
         else
+            errmsg=$(cat /tmp/gunzip_err.txt)
             echo -e "\033[0;31m❌\033[0m 解压失败：$input"
             echo "[$now] ❌ 解压失败：$input" >> "'"$LOG_FILE"'"
+            echo "[$now] 🗑️ 删除输出文件：$output，原因：$errmsg" >> "'"$LOG_FILE"'"
+            rm -f "$output"
         fi
     ' _ {}
 }
