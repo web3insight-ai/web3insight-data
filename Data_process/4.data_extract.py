@@ -11,11 +11,11 @@ import os
 import json
 import csv
 import argparse
-from multiprocessing import Pool
+import multiprocessing as mp
 from datetime import datetime
 
-# ========= 路径配置 =========
-INPUT_BASE = "../Data/cleaned"
+# ========= 路径配置（集中定义） =========
+INPUT_DIR = "../Data/cleaned"
 OUTPUT_BASE = "../Data/structured"
 LOG_DIR = "../Data/logs"
 LOG_FILE = os.path.join(LOG_DIR, "extract.log")
@@ -24,163 +24,131 @@ os.makedirs(LOG_DIR, exist_ok=True)
 
 # ========= 日志函数 =========
 def log(msg):
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    line = f"[{ts}] {msg}"
-    print(line)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    full_msg = f"[{timestamp}] {msg}"
+    print(full_msg)
     with open(LOG_FILE, "a") as f:
-        f.write(line + "\n")
+        f.write(full_msg + "\n")
 
 
-# ========= 结构提取逻辑 =========
-def extract_from_file(input_path, output_prefix):
-    actors = {}
-    repos = {}
-    interactions = []
-
+# ========= 处理单个文件 =========
+def process_file(input_path):
     try:
         with open(input_path, "r") as f:
-            for line in f:
-                try:
-                    event = json.loads(line)
-                    actor = event.get("actor", {})
-                    repo = event.get("repo", {})
-                    type_ = event.get("type", "")
-                    created_at = event.get("created_at", "")
+            data = json.load(f)
 
-                    # actors
-                    aid = actor.get("id")
-                    if aid:
-                        actors[aid] = actor.get("login", "")
+        actors = {}
+        repos = {}
+        interactions = []
 
-                    # repos
-                    rid = repo.get("id")
-                    if rid:
-                        repos[rid] = repo.get("name", "")
+        for event in data:
+            actor = event.get("actor", {})
+            repo = event.get("repo", {})
+            event_type = event.get("type")
+            created_at = event.get("created_at")
 
-                    # interaction
-                    if aid and rid:
-                        interactions.append([aid, rid, type_, created_at])
-                except:
-                    continue
+            actor_id = actor.get("id")
+            actor_login = actor.get("login")
+            repo_id = repo.get("id")
+            repo_name = repo.get("name")
 
-        if not interactions:
-            log(f"⚠️ 无交互数据：{input_path}")
-            return
+            if actor_id and actor_login:
+                actors[actor_id] = actor_login
+            if repo_id and repo_name:
+                repos[repo_id] = repo_name
+            if actor_id and repo_id and event_type and created_at:
+                interactions.append([actor_id, repo_id, event_type, created_at])
 
-        os.makedirs(os.path.dirname(output_prefix), exist_ok=True)
+        # 组织输出路径
+        rel_subpath = os.path.relpath(input_path, INPUT_DIR)
+        rel_no_ext = rel_subpath.replace(".cleaned.json", "")
+        rel_date_path = os.path.dirname(rel_no_ext)
+        filename = os.path.basename(rel_no_ext)
 
-        # 写 actors
-        with open(output_prefix + "_actors.csv", "w", newline="") as fa:
+        actor_path = os.path.join(
+            OUTPUT_BASE, "actors", rel_date_path, f"{filename}.csv"
+        )
+        repo_path = os.path.join(OUTPUT_BASE, "repos", rel_date_path, f"{filename}.csv")
+        interact_path = os.path.join(
+            OUTPUT_BASE, "events", rel_date_path, f"{filename}.csv"
+        )
+
+        os.makedirs(os.path.dirname(actor_path), exist_ok=True)
+        os.makedirs(os.path.dirname(repo_path), exist_ok=True)
+        os.makedirs(os.path.dirname(interact_path), exist_ok=True)
+
+        with open(actor_path, "w", newline="") as fa:
             writer = csv.writer(fa)
             writer.writerow(["actor_id", "actor_login"])
             for aid, login in actors.items():
                 writer.writerow([aid, login])
 
-        # 写 repos
-        with open(output_prefix + "_repos.csv", "w", newline="") as fr:
+        with open(repo_path, "w", newline="") as fr:
             writer = csv.writer(fr)
             writer.writerow(["repo_id", "repo_name"])
             for rid, name in repos.items():
                 writer.writerow([rid, name])
 
-        # 写 interactions
-        with open(output_prefix + "_interactions.csv", "w", newline="") as fi:
+        with open(interact_path, "w", newline="") as fi:
             writer = csv.writer(fi)
             writer.writerow(["actor_id", "repo_id", "event_type", "created_at"])
             for row in interactions:
                 writer.writerow(row)
 
-        log(f"✅ 提取完成：{input_path} → {output_prefix}_*.csv")
+        log(f"✅ 提取完成：{input_path}")
 
     except Exception as e:
-        log(f"❌ 提取失败：{input_path}，错误：{e}")
+        log(f"❌ 处理失败：{input_path}，错误信息：{e}")
 
 
-# ========= 并行 worker =========
-def worker(pair):
-    input_path, output_prefix = pair
-    extract_from_file(input_path, output_prefix)
+# ========= 扫描输入文件 =========
+def collect_files_by_pattern(option, value):
+    paths = []
+    if option == "-f":
+        paths.append(value)
+    else:
+        base = os.path.join(INPUT_DIR, value)
+        for root, _, files in os.walk(base):
+            for fname in files:
+                if fname.endswith(".cleaned.json"):
+                    paths.append(os.path.join(root, fname))
+    return paths
 
 
-# ========= 路径扫描 =========
-def collect_file_pairs(sub_path):
-    input_root = os.path.join(INPUT_BASE, sub_path)
-    output_root = os.path.join(OUTPUT_BASE, sub_path)
-    file_pairs = []
-
-    for root, _, files in os.walk(input_root):
-        for fname in files:
-            if fname.endswith(".cleaned.json"):
-                rel_path = os.path.relpath(os.path.join(root, fname), input_root)
-                input_path = os.path.join(input_root, rel_path)
-                rel_no_ext = rel_path.replace(".cleaned.json", "")
-                output_prefix = os.path.join(output_root, rel_no_ext)
-                file_pairs.append((input_path, output_prefix))
-
-    return file_pairs
-
-
-# ========= CLI 帮助 =========
-def show_help():
-    print(
-        f"""
-用法:
-  python 4.extract.py [选项]
-
-选项:
-  -f <file.json>         提取单个文件（如 2025/09/01/2025-09-01-15.cleaned.json）
-  -d <YYYY/MM/DD>        提取某天目录
-  -m <YYYY/MM>           提取某月目录
-  -y <YYYY>              提取某年目录
-  -j <N>                 并行任务数（默认 4）
-  -h                     显示帮助信息
-
-默认路径:
-  输入目录:   {INPUT_BASE}
-  输出目录:   {OUTPUT_BASE}
-  日志文件:   {LOG_FILE}
-
-示例:
-  python 4.extract.py -f 2025/09/01/2025-09-01-15.cleaned.json
-  python 4.extract.py -d 2025/09/01
-  python 4.extract.py -m 2025/09
-  python 4.extract.py -y 2025
-  python 4.extract.py -d 2025/09/01 -j 8
-"""
-    )
-
-
-# ========= 主程序 =========
+# ========= 主程序入口 =========
 def main():
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("-f", type=str, help="单个文件路径")
-    parser.add_argument("-d", type=str, help="指定某日目录")
-    parser.add_argument("-m", type=str, help="指定某月目录")
-    parser.add_argument("-y", type=str, help="指定某年目录")
-    parser.add_argument("-j", type=int, default=4, help="并行进程数")
-    parser.add_argument("-h", action="store_true", help="显示帮助信息")
+    parser = argparse.ArgumentParser(
+        description="结构化提取：actors、repos、interactions"
+    )
+    parser.add_argument("-f", help="指定单个文件")
+    parser.add_argument("-d", help="指定日期目录（如 2025/09/01）")
+    parser.add_argument("-m", help="指定月份目录（如 2025/09）")
+    parser.add_argument("-y", help="指定年份目录（如 2025）")
+    parser.add_argument("-j", help="并行数，默认 8", default=8, type=int)
+
     args = parser.parse_args()
 
-    if args.h:
-        show_help()
-        return
-
+    option = None
+    value = None
     if args.f:
-        rel_path = args.f
-        input_path = os.path.join(INPUT_BASE, rel_path)
-        output_prefix = os.path.join(OUTPUT_BASE, rel_path.replace(".cleaned.json", ""))
-        extract_from_file(input_path, output_prefix)
+        option, value = "-f", args.f
+    elif args.d:
+        option, value = "-d", args.d
+    elif args.m:
+        option, value = "-m", args.m
+    elif args.y:
+        option, value = "-y", args.y
+    else:
+        parser.print_help()
         return
 
-    sub_path = args.d or args.m or args.y
-    if sub_path:
-        file_pairs = collect_file_pairs(sub_path)
-        log(f"📦 共 {len(file_pairs)} 个文件，将使用 {args.j} 进程提取结构化数据")
-        with Pool(processes=args.j) as pool:
-            pool.map(worker, file_pairs)
-        return
+    all_files = collect_files_by_pattern(option, os.path.join(INPUT_DIR, value))
+    log(f"📂 共发现 {len(all_files)} 个文件，开始并行提取……")
 
-    show_help()
+    with mp.Pool(processes=args.j) as pool:
+        pool.map(process_file, all_files)
+
+    log("✅ 全部任务完成")
 
 
 if __name__ == "__main__":

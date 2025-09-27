@@ -8,6 +8,7 @@ Data/raw/**
 Data/logs/** 
 Data/extracted/**
 Data/cleaned/** 
+Data/structured/**
 
 # neo4j
 for_neo4j/data/data_clean/**
