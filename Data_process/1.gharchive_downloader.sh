@@ -3,11 +3,11 @@ set -e
 
 ###
 # @Author: Justin
-# @Date: 2025-07-19 14:10:10
+# @Date: 2025-07-19
 # @filename: 1.gharchive_downloader.sh
-# @version: 1.1
-# @Description: gharchive数据下载脚本（增强日志）
- # @LastEditTime: 2025-09-27 20:41:51
+# @version: 1.2
+# @Description: gharchive数据下载脚本（macOS + Linux 兼容版，含日志）
+ # @LastEditTime: 2025-09-27 20:44:17
 ###
 
 RAW_DIR="../Data/raw"
@@ -22,12 +22,36 @@ log_msg() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
-# 创建三级目录并下载某天所有小时数据
+# 检测系统类型（macOS vs Linux）
+IS_MACOS=false
+if [[ "$(uname)" == "Darwin" ]]; then
+  IS_MACOS=true
+fi
+
+# 将 YYYY-MM-DD 转换为 Unix 时间戳（兼容 macOS 和 Linux）
+to_timestamp() {
+  if $IS_MACOS; then
+    date -jf "%Y-%m-%d" "$1" +%s
+  else
+    date -d "$1" +%s
+  fi
+}
+
+# 日期加一天（返回 YYYY-MM-DD）
+add_one_day() {
+  if $IS_MACOS; then
+    date -v+1d -jf "%Y-%m-%d" "$1" +"%Y-%m-%d"
+  else
+    date -d "$1 + 1 day" +"%Y-%m-%d"
+  fi
+}
+
+# 下载某天的数据
 download_day() {
   date="$1"
-  year=$(date -d "$date" +%Y)
-  month=$(date -d "$date" +%m)
-  day=$(date -d "$date" +%d)
+  year=$(echo "$date" | cut -d- -f1)
+  month=$(echo "$date" | cut -d- -f2)
+  day=$(echo "$date" | cut -d- -f3)
 
   day_dir="$RAW_DIR/$year/$month/$day"
   mkdir -p "$day_dir"
@@ -62,15 +86,15 @@ download_day() {
   done
 }
 
-# 下载指定日期范围
+# 下载日期范围
 download_range() {
   start_date="$1"
   end_date="$2"
 
   current="$start_date"
-  while [ "$(date -I -d "$current")" != "$(date -I -d "$end_date + 1 day")" ]; do
+  while [ "$(to_timestamp "$current")" -le "$(to_timestamp "$end_date")" ]; do
     download_day "$current"
-    current=$(date -I -d "$current + 1 day")
+    current=$(add_one_day "$current")
   done
 }
 
@@ -93,8 +117,14 @@ if [ "$1" = "--all" ]; then
     for month in $(seq -w 1 12); do
       for day in $(seq -w 1 31); do
         date="$year-$month-$day"
-        if date -d "$date" >/dev/null 2>&1; then
-          download_day "$date"
+        if $IS_MACOS; then
+          if date -jf "%Y-%m-%d" "$date" +%Y &>/dev/null; then
+            download_day "$date"
+          fi
+        else
+          if date -d "$date" &>/dev/null; then
+            download_day "$date"
+          fi
         fi
       done
     done
