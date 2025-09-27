@@ -4,10 +4,11 @@
 
 
 # data
-Data/raw/
-Data/extracted/
-Data/Neo4j.bak/**
-Data/PGSQL.bak/**
+Data/raw/** 
+Data/logs/** 
+Data/unziped/** 
+Data/clean/** 
+
 
 ## SQL-DATA
 SQL/SQL_with_normzlization/output/** 
