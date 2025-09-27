@@ -5,13 +5,13 @@
  # @filename: 
  # @version: 
  # @Description: 
- # @LastEditTime: 2025-09-01 23:35:12
+ # @LastEditTime: 2025-09-27 21:13:05
 ### 
 
 # === 配置参数 ===
 DB_NAME="your_database"          # 数据库名
 DB_USER="postgres"               # 用户名
-EXPORT_DIR="/Data/data_raw"  # 这里是输出目录
+EXPORT_DIR="./data/data_raw"  # 这里是输出目录
 mkdir -p "$EXPORT_DIR"
 
 # === 1. 一次性导出 actors 和 repos ===
