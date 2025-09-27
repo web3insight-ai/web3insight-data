@@ -1,11 +1,9 @@
-#!/usr/bin/env python3
 """
 @Author: Justin
-@Date: 2025-09-27
+@Date: 2025-07-27
 @Filename: 3.clean.py
-# @version: 1.2
+@version: 1.2
 @Description: gharchive 清洗脚本（字段标准化 + 并行 + 多级目录支持）
-@Version: 2.0
 """
 
 import os

@@ -9,6 +9,10 @@ Data/logs/**
 Data/extracted/**
 Data/cleaned/** 
 
+# neo4j
+for_neo4j/data/data_clean/**
+for_neo4j/data/data_raw/**
+for_neo4j/data/logs/**
 
 ## SQL-DATA
 SQL/SQL_with_normzlization/output/** 
