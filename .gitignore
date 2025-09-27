@@ -7,7 +7,7 @@
 Data/raw/** 
 Data/logs/** 
 Data/extracted/**
-Data/clean/** 
+Data/cleaned/** 
 
 
 ## SQL-DATA
