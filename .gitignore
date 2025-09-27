@@ -6,7 +6,7 @@
 # data
 Data/raw/** 
 Data/logs/** 
-Data/unziped/** 
+Data/extracted/**
 Data/clean/** 
 
 

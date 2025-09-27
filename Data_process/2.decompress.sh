@@ -6,7 +6,7 @@ set -e
 # @filename: 2.decompress.sh
 # @version: 1.2
 # @Description: gharchive 解压缩脚本（macOS+Linux 兼容 + 日志增强）
- # @LastEditTime: 2025-09-27 20:50:00
+ # @LastEditTime: 2025-09-27 20:51:25
 ###
 
 RAW_BASE="../Data/raw"
@@ -75,16 +75,18 @@ decompress_dir_parallel() {
     done | tr '\n' '\0' | xargs -0 -P "$JOBS" -n 1 -I {} bash -c '
         input="${1%%:::*}"
         output="${1##*:::}"
+        now=$(date "+%Y-%m-%d %H:%M:%S")
+
         mkdir -p "$(dirname "$output")"
         if [[ -f "$output" ]]; then
             echo -e "\033[0;34m⏭️\033[0m 已存在，跳过：$output"
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ⏭️ 已存在，跳过：$output" >> "'"$LOG_FILE"'"
+            echo "[$now] ⏭️ 已存在，跳过：$output" >> "'"$LOG_FILE"'"
         elif gunzip -c "$input" > "$output"; then
             echo -e "\033[0;32m✅\033[0m 解压完成：$input → $output"
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✅ 解压完成：$input → $output" >> "'"$LOG_FILE"'"
+            echo "[$now] ✅ 解压完成：$input → $output" >> "'"$LOG_FILE"'"
         else
             echo -e "\033[0;31m❌\033[0m 解压失败：$input"
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ❌ 解压失败：$input" >> "'"$LOG_FILE"'"
+            echo "[$now] ❌ 解压失败：$input" >> "'"$LOG_FILE"'"
         fi
     ' _ {}
 }
