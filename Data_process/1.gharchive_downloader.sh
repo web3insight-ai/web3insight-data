@@ -1,17 +1,26 @@
 #!/bin/bash
+set -e
 
 ###
 # @Author: Justin
 # @Date: 2025-07-19 14:10:10
-# @filename: 
-# @version: 
-# @Description: 
- # @LastEditTime: 2025-09-26 15:13:40
-### 
--set -e
+# @filename: 1.gharchive_downloader.sh
+# @version: 1.1
+# @Description: gharchive数据下载脚本（增强日志）
+ # @LastEditTime: 2025-09-27 20:41:51
+###
 
-RAW_DIR="./raw"
+RAW_DIR="../Data/raw"
+LOG_DIR="../Data/logs"
+LOG_FILE="$LOG_DIR/gharchive_download.log"
 BASE_URL="https://data.gharchive.org"
+RETRIES=3
+
+mkdir -p "$LOG_DIR"
+
+log_msg() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+}
 
 # 创建三级目录并下载某天所有小时数据
 download_day() {
@@ -30,10 +39,25 @@ download_day() {
 
     if [ -f "$outpath" ]; then
       echo "已存在：$outpath，跳过。"
+      log_msg "SKIP   $outpath 已存在"
     else
       echo "下载中：$url"
-      curl -s -o "$outpath" "$url"
-      echo "下载完成：$outpath" 
+      success=false
+      for attempt in $(seq 1 $RETRIES); do
+        if curl -C - -s -o "$outpath" "$url"; then
+          echo "下载完成：$outpath"
+          log_msg "SUCCESS $url -> $outpath"
+          success=true
+          break
+        else
+          log_msg "RETRY  ($attempt) $url 失败"
+          sleep 1
+        fi
+      done
+      if ! $success; then
+        echo "❌ 下载失败：$url"
+        log_msg "FAILED $url"
+      fi
     fi
   done
 }
@@ -54,9 +78,13 @@ download_range() {
 print_help() {
   echo "用法：$0 [选项]"
   echo "选项："
-  echo "  --all                 下载全部数据（修改脚本内年份范围）"
+  echo "  --all                             下载全部数据（修改脚本内年份范围）"
   echo "  --from YYYY-MM-DD --to YYYY-MM-DD    下载指定日期范围"
-  echo "  --help                显示帮助信息"
+  echo "  --help                            显示帮助信息"
+  echo ""
+  echo "示例："
+  echo "  $0 --from 2025-09-01 --to 2025-09-03"
+  echo "  # 下载 2025 年 9 月 1 日 到 9 月 3 日（含）的 gharchive 数据"
 }
 
 # 参数处理
