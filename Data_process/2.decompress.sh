@@ -1,18 +1,21 @@
 #!/bin/bash
-
+set -e
 ###
 # @Author: Justin
-# @Date: 2025-07-19 14:10:10
-# @filename: 
-# @version: 
-# @Description: 
- # @LastEditTime: 2025-09-26 15:13:33
-### 
--set -e
+# @Date: 2025-07-19
+# @filename: 2.decompress.sh
+# @version: 1.2
+# @Description: gharchive 解压缩脚本（macOS+Linux 兼容 + 日志增强）
+ # @LastEditTime: 2025-09-27 20:50:00
+###
 
-RAW_BASE="./raw"
-EXTRACTED_BASE="./extracted"
+RAW_BASE="../Data/raw"
+EXTRACTED_BASE="../Data/extracted"
+LOG_DIR="../Data/logs"
+LOG_FILE="$LOG_DIR/decompress.log"
 JOBS=8 # 默认并行任务数
+
+mkdir -p "$LOG_DIR"
 
 # ANSI颜色
 RED='\033[0;31m'
@@ -31,6 +34,10 @@ show_help() {
     echo "  -y <YYYY>             解压指定年份所有目录"
     echo "  -j <并行数>            并行任务数（默认 8）"
     echo "  -h                    显示帮助"
+    echo ""
+    echo "示例:"
+    echo "  $0 -d 2025/09/01      解压指定日期的数据"
+    echo "  $0 -f ../Data/raw/2025/09/01/2025-09-01-15.json.gz"
 }
 
 log() {
@@ -38,6 +45,7 @@ log() {
     color="$2"
     message="$3"
     echo -e "${color}${prefix}${NC} ${message}"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ${prefix} ${message}" >> "$LOG_FILE"
 }
 
 decompress_one() {
@@ -61,23 +69,27 @@ decompress_dir_parallel() {
     output_dir="$2"
     log "📁" "$YELLOW" "正在处理目录：$input_dir → $output_dir"
 
-    find "$input_dir" -type f -name '*.json.gz' | while read -r file; do
+    find "$input_dir" -type f -name '*.json.gz' -print0 | while IFS= read -r -d '' file; do
         relative="${file#$input_dir/}"
         echo "$file:::${output_dir}/${relative%.gz}"
-    done | xargs -P "$JOBS" -n 1 -d '\n' -I {} bash -c '
+    done | tr '\n' '\0' | xargs -0 -P "$JOBS" -n 1 -I {} bash -c '
         input="${1%%:::*}"
         output="${1##*:::}"
         mkdir -p "$(dirname "$output")"
         if [[ -f "$output" ]]; then
             echo -e "\033[0;34m⏭️\033[0m 已存在，跳过：$output"
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ⏭️ 已存在，跳过：$output" >> "'"$LOG_FILE"'"
         elif gunzip -c "$input" > "$output"; then
             echo -e "\033[0;32m✅\033[0m 解压完成：$input → $output"
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✅ 解压完成：$input → $output" >> "'"$LOG_FILE"'"
         else
             echo -e "\033[0;31m❌\033[0m 解压失败：$input"
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ❌ 解压失败：$input" >> "'"$LOG_FILE"'"
         fi
     ' _ {}
 }
 
+# 参数解析
 while getopts ":f:d:m:y:j:h" opt; do
     case $opt in
         f)

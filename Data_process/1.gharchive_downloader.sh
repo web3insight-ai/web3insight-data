@@ -7,7 +7,7 @@ set -e
 # @filename: 1.gharchive_downloader.sh
 # @version: 1.2
 # @Description: gharchive数据下载脚本（macOS + Linux 兼容版，含日志）
- # @LastEditTime: 2025-09-27 20:44:17
+ # @LastEditTime: 2025-09-27 20:46:58
 ###
 
 RAW_DIR="../Data/raw"
@@ -66,6 +66,7 @@ download_day() {
       log_msg "SKIP   $outpath 已存在"
     else
       echo "下载中：$url"
+      log_msg "START  下载 $url"
       success=false
       for attempt in $(seq 1 $RETRIES); do
         if curl -C - -s -o "$outpath" "$url"; then
