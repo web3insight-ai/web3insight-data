@@ -15,9 +15,7 @@
 - `test` : 测试脚本
 
 
-
 ## 核心功能
-
 1. 下载数据：参考 `Data/gharchive_downloader.sh`
 2. 清洗数据：参考 `Data_process/data_process_for_one.ipynb`
 3. 导入Neo4j：参考 `Data_process/for_neo4j`
