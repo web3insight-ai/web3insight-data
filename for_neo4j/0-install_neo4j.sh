@@ -1,15 +1,16 @@
 #!/bin/bash
+set -e
+
 ###
  # @Author: Justin
- # @Date: 2025-09-20 00:10:46
+ # @Date: 2025-08-20 00:10:46
  # @filename: 
  # @version: 
  # @Description: 
- # @LastEditTime: 2025-09-20 00:13:38
+ # @LastEditTime: 2025-09-28 13:08:24
 ### 
 
 
-set -e
 
 # === 用户可自定义部分 ===
 NEO4J_RPM_FILE="neo4j-2025.08.0-1.noarch.rpm"   # 替换实际下载的文件名

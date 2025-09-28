@@ -1,11 +1,12 @@
 #!/bin/bash
+set -e
 ###
  # @Author: Justin
- # @Date: 2025-09-19 23:38:37
+ # @Date: 2025-08-19 23:38:37
  # @filename: 
  # @version: 
  # @Description: 
- # @LastEditTime: 2025-09-20 01:18:56
+ # @LastEditTime: 2025-09-28 13:08:42
 ### 
 
 # 文件路径
