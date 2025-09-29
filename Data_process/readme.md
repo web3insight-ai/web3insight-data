@@ -73,13 +73,13 @@ cd Data_process
 ### 清洗数据（支持并行）
 
 ```bash
-python3 3.clean.py -d 2025/09/01 -j 8
+python3 3.data_clean.py -d 2025/09/01 -j 8
 ```
 
 ### 提取结构化数据
 
 ```bash
-python3 4.extract.py -d 2025/09/01 -j 8
+python3 4.data_extract.py -d 2025/09/01 -j 8
 ```
 
 输出数据将分别保存至：

@@ -6,7 +6,7 @@ set -e
  # @filename: 
  # @version: 
  # @Description: 
- # @LastEditTime: 2025-09-28 13:08:42
+ # @LastEditTime: 2025-09-29 10:04:47
 ### 
 
 # 文件路径
@@ -79,7 +79,7 @@ if [ $IMPORT_STATUS -eq 0 ]; then
   echo "✅ 导入成功，数据库 [$DB_NAME] 已准备好。"
   echo "📄 日志已保存到: $LOG_FILE"
   
-  # 设置默认数据库
+  # 设置默认数据库 
   echo "🔧 设置默认数据库为 [$DB_NAME]..."
   # 如果已存在该项，则替换；否则添加
   if grep -q "^dbms.default_database=" "$NEO4J_CONF"; then

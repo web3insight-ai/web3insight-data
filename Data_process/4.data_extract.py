@@ -14,7 +14,7 @@ import argparse
 import multiprocessing as mp
 from datetime import datetime
 
-# ========= 路径配置（集中定义） =========
+# ========= 路径配置 =========
 INPUT_DIR = "../Data/cleaned"
 OUTPUT_BASE = "../Data/structured"
 LOG_DIR = "../Data/logs"
@@ -34,8 +34,12 @@ def log(msg):
 # ========= 处理单个文件 =========
 def process_file(input_path):
     try:
+        data = []
         with open(input_path, "r") as f:
-            data = json.load(f)
+            for line in f:
+                line = line.strip()
+                if line:
+                    data.append(json.loads(line))
 
         actors = {}
         repos = {}
@@ -59,7 +63,7 @@ def process_file(input_path):
             if actor_id and repo_id and event_type and created_at:
                 interactions.append([actor_id, repo_id, event_type, created_at])
 
-        # 组织输出路径
+        # 构造输出路径
         rel_subpath = os.path.relpath(input_path, INPUT_DIR)
         rel_no_ext = rel_subpath.replace(".cleaned.json", "")
         rel_date_path = os.path.dirname(rel_no_ext)
@@ -95,7 +99,7 @@ def process_file(input_path):
             for row in interactions:
                 writer.writerow(row)
 
-        log(f"✅ 提取完成：{input_path}")
+        log(f"✅ 提取完成：{input_path}（共 {len(data)} 条事件）")
 
     except Exception as e:
         log(f"❌ 处理失败：{input_path}，错误信息：{e}")
@@ -142,7 +146,7 @@ def main():
         parser.print_help()
         return
 
-    all_files = collect_files_by_pattern(option, os.path.join(INPUT_DIR, value))
+    all_files = collect_files_by_pattern(option, value)
     log(f"📂 共发现 {len(all_files)} 个文件，开始并行提取……")
 
     with mp.Pool(processes=args.j) as pool:
