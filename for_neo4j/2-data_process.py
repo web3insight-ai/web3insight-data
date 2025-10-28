@@ -15,9 +15,8 @@ from glob import glob
 # 路径设置
 RAW_DIR = "./data/data_raw"
 CLEAN_DIR = "./data/data_clean"
-EDGECLEAN_DIR = "./data/data_edgeclean"
+
 os.makedirs(CLEAN_DIR, exist_ok=True)
-os.makedirs(EDGECLEAN_DIR, exist_ok=True)
 
 
 ### 1. 处理 actors 节点 ###
@@ -66,8 +65,39 @@ def clean_repos():
 ### 3. 处理 events 边 ###
 # 这里的边 是分为了多个文件的，
 def clean_events_split():
+    # 检查缺失节点文件
+    missing_repo_file = os.path.join(CLEAN_DIR, "missing_repo_ids.txt")
+    missing_actor_file = os.path.join(CLEAN_DIR, "missing_actor_ids.txt")
+    missing_repo = set()
+    missing_actor = set()
+    if os.path.exists(missing_repo_file):
+        with open(missing_repo_file) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    missing_repo.add(line)
+    if os.path.exists(missing_actor_file):
+        with open(missing_actor_file) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    missing_actor.add(line)
+    if missing_repo:
+        print(
+            f"🔍 检测到 {len(missing_repo)} 个缺失 repo_id，将在 clean 时过滤相关边。"
+        )
+    else:
+        print("✅ 未检测到缺失 repo_id。")
+    if missing_actor:
+        print(
+            f"🔍 检测到 {len(missing_actor)} 个缺失 actor_id，将在 clean 时过滤相关边。"
+        )
+    else:
+        print("✅ 未检测到缺失 actor_id。")
+
     for file in sorted(glob(f"{RAW_DIR}/events_*.csv")):
         df = pd.read_csv(file, low_memory=False)
+        before = len(df)
         # 字段重命名
         df.rename(
             columns={
@@ -77,10 +107,15 @@ def clean_events_split():
             },
             inplace=True,
         )
+        # 自动过滤引用缺失节点的边（如果缺失id存在）
+        if missing_repo and ":END_ID(Repo)" in df.columns:
+            df = df[~df[":END_ID(Repo)"].astype(str).isin(missing_repo)]
+        if missing_actor and ":START_ID(Actor)" in df.columns:
+            df = df[~df[":START_ID(Actor)"].astype(str).isin(missing_actor)]
+        after = len(df)
 
         # 添加边类型
         df[":TYPE"] = "INTERACTS_WITH"
-
         # 重排序字段
         reorder = [
             "event_id",
@@ -98,14 +133,12 @@ def clean_events_split():
             ":TYPE",
         ]
         df = df[[col for col in reorder if col in df.columns]]
-
-        # 输出为清洗后的分文件
         basename = os.path.basename(file).replace("events_", "event_repo_edge_")
         out_path = os.path.join(CLEAN_DIR, basename)
         df.to_csv(out_path, index=False)
-        print(f"✅ cleaned: {basename}")
+        print(f"✅ cleaned: {basename}（原始 {before} 条，过滤后 {after} 条）")
 
-    print("🎉 All events cleaned and saved as separate files.")
+    print("🎉 All events cleaned and saved as legal edges in data_edgeclean/.")
 
 
 ### 4. 检查 events 边文件是否有引用缺失节点 ###
