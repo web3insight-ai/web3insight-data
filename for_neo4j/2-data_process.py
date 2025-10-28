@@ -9,6 +9,7 @@ LastEditTime: 2025-09-01 14:27:33
 
 import os
 import sys
+import re
 import pandas as pd
 from glob import glob
 
@@ -64,8 +65,8 @@ def clean_repos():
 
 ### 3. 处理 events 边 ###
 # 这里的边 是分为了多个文件的，
-def clean_events_split():
-    # 检查缺失节点文件
+def clean_events_split(start_ym=None, end_ym=None):
+    # 检查缺失节点文件...
     missing_repo_file = os.path.join(CLEAN_DIR, "missing_repo_ids.txt")
     missing_actor_file = os.path.join(CLEAN_DIR, "missing_actor_ids.txt")
     missing_repo_set = set()
@@ -94,33 +95,47 @@ def clean_events_split():
         )
     else:
         print("✅ 未检测到缺失 actor_id。")
-    # 类型异常
-    illegal_actor_file = os.path.join(CLEAN_DIR, "illegal_actor_id_events.txt")
-    illegal_repo_file = os.path.join(CLEAN_DIR, "illegal_repo_id_events.txt")
-    illegal_actor_set = set()
-    illegal_repo_set = set()
-    if os.path.exists(illegal_actor_file):
-        with open(illegal_actor_file) as f:
-            illegal_actor_set = set(line.strip() for line in f)
-    if os.path.exists(illegal_repo_file):
-        with open(illegal_repo_file) as f:
-            illegal_repo_set = set(line.strip() for line in f)
 
-    for file in sorted(glob(f"{RAW_DIR}/events_*.csv")):
+    # 按年月过滤文件名
+    event_files = sorted(glob(f"{RAW_DIR}/events_*.csv"))
+    pattern = re.compile(r"events_(\d{4})_(\d{2})\.csv")
+    file_months = []
+    for f in event_files:
+        m = pattern.search(os.path.basename(f))
+        if m:
+            y, mth = m.group(1), m.group(2)
+            file_months.append((f, int(y) * 100 + int(mth)))
+    # 处理时间区间参数
+    if start_ym is not None:
+        start = int(start_ym.replace("_", ""))
+    else:
+        start = min([fm[1] for fm in file_months]) if file_months else 0
+    if end_ym is not None:
+        end = int(end_ym.replace("_", ""))
+    else:
+        end = max([fm[1] for fm in file_months]) if file_months else 999999
+    # 筛选文件
+    target_files = [f for f, ym in file_months if start <= ym <= end]
+    print(f"📅 处理事件分片文件区间：{start} 到 {end}，共 {len(target_files)} 个分片。")
+    if not target_files:
+        print("⚠️ 未找到符合条件的事件分片文件。")
+        return
+
+    for idx, file in enumerate(target_files):
         df = pd.read_csv(file, low_memory=False)
         before = len(df)
-        df = df[
-            [
-                "id",
-                "actor_id",
-                "repo_id",
-                "org_id",
-                "org_login",
-                "event_type",
-                "abnormal",
-                "created_at",
-            ]
+        # 只保留你想要的字段
+        keep_cols = [
+            "id",
+            "actor_id",
+            "repo_id",
+            "org_id",
+            "org_login",
+            "event_type",
+            "abnormal",
+            "created_at",
         ]
+        df = df[[col for col in keep_cols if col in df.columns]]
         # 字段重命名
         df.rename(
             columns={
@@ -131,36 +146,19 @@ def clean_events_split():
             inplace=True,
         )
         # 过滤异常 event（event_id 类型问题 或 两端缺失 node）
-        if (
-            not illegal_actor_set
-            and not illegal_repo_set
-            and not missing_repo_set
-            and not missing_actor_set
-        ):
-            # 没有任何异常，直接保留所有
-            pass
-        else:
-            # 过滤掉异常事件
-            df = df[
-                ~df["event_id"].astype(str).isin(illegal_actor_set | illegal_repo_set)
-            ]
-            if missing_repo_set:
-                df = df[~df[":END_ID(Repo)"].astype(str).isin(missing_repo_set)]
-            if missing_actor_set:
-                df = df[~df[":START_ID(Actor)"].astype(str).isin(missing_actor_set)]
+        if missing_repo_set:
+            df = df[~df[":END_ID(Repo)"].astype(str).isin(missing_repo_set)]
+        if missing_actor_set:
+            df = df[~df[":START_ID(Actor)"].astype(str).isin(missing_actor_set)]
         after = len(df)
         df[":TYPE"] = "INTERACTS_WITH"
         reorder = [
             "event_id",
             ":START_ID(Actor)",
-            "actor_login",
             ":END_ID(Repo)",
-            "repo_name",
             "org_id",
             "org_login",
             "event_type",
-            "payload",
-            "body",
             "abnormal",
             "created_at",
             ":TYPE",
@@ -168,9 +166,13 @@ def clean_events_split():
         df = df[[col for col in reorder if col in df.columns]]
         basename = os.path.basename(file).replace("events_", "event_repo_edge_")
         out_path = os.path.join(CLEAN_DIR, basename)
-        df.to_csv(out_path, index=False)
-        print(f"✅ cleaned: {basename}（原始 {before} 条，过滤后 {after} 条）")
-    print("🎉 All events cleaned and saved as legal edges in data_edgeclean/.")
+        df.to_csv(
+            out_path, index=False, header=(idx == 0)
+        )  # 只有第一个有 header，后续的没有header 这是 Neo4j 导入要求
+        print(
+            f"✅ cleaned: {basename}（原始 {before} 条，过滤后 {after} 条，header: {idx==0}）"
+        )
+    print("🎉 All events cleaned and saved as legal edges in data_clean/.")
 
 
 ### 4. 检查 events 边文件是否有引用缺失节点 ###
@@ -251,48 +253,6 @@ def check_nodes():
         print("🎉 所有边文件均无引用缺失 actor 节点。")
 
 
-def is_int_str(x):
-    try:
-        # 必须是整数
-        intx = int(str(x))
-        # 防止'123.0'这种通过
-        return str(x).strip().isdigit() or str(intx) == str(x).strip()
-    except:
-        return False
-
-
-def check_types():
-    illegal_actor_events = set()
-    illegal_repo_events = set()
-    for file in sorted(glob(f"{RAW_DIR}/events_*.csv")):
-        df = pd.read_csv(file, low_memory=False)
-        # 找出 :START_ID(Actor)/actor_id 非整数行
-        if "actor_id" in df.columns:
-            bad_actor = df[~df["actor_id"].apply(is_int_str)]
-            if not bad_actor.empty:
-                illegal_actor_events.update(bad_actor["id"].astype(str).tolist())
-                print(
-                    f"{os.path.basename(file)} 有 {len(bad_actor)} 条 actor_id 类型非法"
-                )
-        if "repo_id" in df.columns:
-            bad_repo = df[~df["repo_id"].apply(is_int_str)]
-            if not bad_repo.empty:
-                illegal_repo_events.update(bad_repo["id"].astype(str).tolist())
-                print(
-                    f"{os.path.basename(file)} 有 {len(bad_repo)} 条 repo_id 类型非法"
-                )
-    # 保存到文件
-    with open(os.path.join(CLEAN_DIR, "illegal_actor_id_events.txt"), "w") as f:
-        for eid in sorted(illegal_actor_events):
-            f.write(eid + "\n")
-    with open(os.path.join(CLEAN_DIR, "illegal_repo_id_events.txt"), "w") as f:
-        for eid in sorted(illegal_repo_events):
-            f.write(eid + "\n")
-    print(
-        f"已保存非法 actor_id 事件 {len(illegal_actor_events)} 条，repo_id 事件 {len(illegal_repo_events)} 条。"
-    )
-
-
 def print_usage():
     print(
         "\n用法: python clean.py [step]\n"
@@ -301,6 +261,7 @@ def print_usage():
     )
 
 
+# 主逻辑参数解析
 if __name__ == "__main__":
     if len(sys.argv) == 1 or sys.argv[1] == "all":
         clean_actors()
@@ -314,10 +275,11 @@ if __name__ == "__main__":
         elif step == "repos":
             clean_repos()
         elif step == "events":
-            clean_events_split()
+            # 支持 events 2024_06 2024_08
+            arg1 = sys.argv[2] if len(sys.argv) > 2 else None
+            arg2 = sys.argv[3] if len(sys.argv) > 3 else None
+            clean_events_split(arg1, arg2)
         elif step == "check_nodes":
             check_nodes()
-        elif step == "check_types":
-            check_types()
         else:
             print_usage()

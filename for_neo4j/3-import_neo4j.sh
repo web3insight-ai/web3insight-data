@@ -6,14 +6,14 @@ set -e
  # @filename: 
  # @version: 
  # @Description: 
- # @LastEditTime: 2025-09-29 10:04:47
+ # @LastEditTime: 2025-10-28 14:27:32
 ### 
 
 # 文件路径
-IMPORT_DIR="/var/lib/neo4j/import" # 这是导入的数据存放的目录
+IMPORT_DIR="/import/data_clean" # 这是导入的数据存放的目录
 ACTORS="$IMPORT_DIR/actors_neo4j_node.csv" # 这是 actors 文件
 REPOS="$IMPORT_DIR/repos_neo4j_node.csv" # 这是 repos 文件
-EDGES="$IMPORT_DIR/event_repo_edge_*.csv" # 这是 edges 文件
+# EDGES="$IMPORT_DIR/event_repo_edge_*.csv" # 这是 edges 文件 已经废弃，改为动态查找并拼接
 REPORT="$IMPORT_DIR/import.report" # 这是报告文件
 TEMP_PATH="/var/lib/neo4j/tmp" # 临时文件路径
 DB_NAME="github" # 数据库名称
@@ -22,6 +22,15 @@ NEO4J_CONF="/etc/neo4j/neo4j.conf" # Neo4j 配置文件路径
 
 # 日志路径
 LOG_FILE="/var/log/neo4j/neo4j-import-$(date +%F-%H-%M-%S).log"
+
+
+# 关键：找到所有关系文件，用英文逗号拼起来
+EDGE_FILES=($IMPORT_DIR/event_repo_edge_*.csv)
+if [ ${#EDGE_FILES[@]} -eq 0 ]; then
+  echo "❌ 未找到任何关系文件: $IMPORT_DIR/event_repo_edge_*.csv"
+  exit 1
+fi
+EDGES=$(IFS=,; echo "${EDGE_FILES[*]}")
 
 # 检查文件是否存在
 check_file() {
@@ -43,7 +52,7 @@ check_database_exists() {
 echo "🔍 检查文件是否存在..."
 check_file "$ACTORS"
 check_file "$REPOS"
-check_file $(echo $EDGES | cut -d' ' -f1) 
+check_file "${EDGE_FILES[0]}"
 
 echo "🔍 检查数据库 [$DB_NAME] 是否已存在..."
 check_database_exists
