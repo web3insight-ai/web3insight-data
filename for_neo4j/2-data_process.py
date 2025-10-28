@@ -278,6 +278,11 @@ if __name__ == "__main__":
             # 支持 events 2024_06 2024_08
             arg1 = sys.argv[2] if len(sys.argv) > 2 else None
             arg2 = sys.argv[3] if len(sys.argv) > 3 else None
+            # 处理默认时间范围
+            if arg1 is None:
+                arg1 = "2015_01"
+            if arg2 is None:
+                arg2 = "2025_12"
             clean_events_split(arg1, arg2)
         elif step == "check_nodes":
             check_nodes()
