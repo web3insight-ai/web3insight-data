@@ -255,9 +255,23 @@ def check_nodes():
 
 def print_usage():
     print(
-        "\n用法: python clean.py [step]\n"
-        "step 可选: actors | repos | events | check_nodes | all\n"
-        "示例: python clean.py check_nodes\n"
+        """
+        用法: python clean.py [step] [start_ym] [end_ym]
+
+        step 可选: 
+        actors         # 清洗 actors 节点
+        repos          # 清洗 repos 节点
+        events         # 清洗 events 边，支持可选年月区间（如 2024_06 2024_08）
+        check_nodes    # 检查边引用的节点是否缺失
+        all            # 执行全部步骤（actors + repos + events）
+
+        示例:
+        python clean.py actors
+        python clean.py repos
+        python clean.py events 2024_06 2024_08
+        python clean.py check_nodes
+        python clean.py all
+        """
     )
 
 
